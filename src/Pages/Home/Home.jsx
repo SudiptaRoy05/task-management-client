@@ -1,12 +1,14 @@
 
 import Navbar from "../../Component/Navbar/Navbar";
-import TaskBoard from "../TaskBoard/TaskBoard";
+import AddTask from "../TaskBoard/AddTask";
+import TaskBoards from "../TaskBoard/TaskBoards";
 
 export default function Home() {
   return (
-    <div>
+    <div >
       <Navbar></Navbar>
-      <TaskBoard></TaskBoard>
+      <AddTask></AddTask>
+      <TaskBoards></TaskBoards>
     </div>
   )
 }
