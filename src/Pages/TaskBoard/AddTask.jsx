@@ -2,14 +2,24 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import axios from "axios";
 import Swal from "sweetalert2"; // Import SweetAlert2
+import { io } from "socket.io-client"; // Import Socket.io client
+
+// Set up the socket connection
+const socket = io("http://localhost:5000");
 
 export default function AddTask() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [taskTitle, setTaskTitle] = useState("");
     const [taskDescription, setTaskDescription] = useState("");
+    const [taskFinishTime, setTaskFinishTime] = useState(""); // New state for finish time
 
     const openModal = () => setIsModalOpen(true);
-    const closeModal = () => setIsModalOpen(false);
+    const closeModal = () => {
+        setIsModalOpen(false);
+        setTaskTitle("");
+        setTaskDescription("");
+        setTaskFinishTime(""); // Reset finish time when closing modal
+    };
 
     const handleAddTask = async (e) => {
         e.preventDefault();
@@ -17,7 +27,9 @@ export default function AddTask() {
             title: taskTitle,
             description: taskDescription,
             category: "todo",
-        }
+            timestamp: new Date().toISOString(), // Auto-generate timestamp
+            finishTime: taskFinishTime, // Store finish time
+        };
 
         try {
             const { data } = await axios.post("http://localhost:5000/tasks", task);
@@ -25,33 +37,34 @@ export default function AddTask() {
 
             // Show success notification
             Swal.fire({
-                icon: 'success',
-                title: 'Task Added!',
-                text: 'Your task has been successfully added.',
-                confirmButtonText: 'OK',
-                timer: 2000,  // Auto close after 2 seconds
+                icon: "success",
+                title: "Task Added!",
+                text: "Your task has been successfully added.",
+                confirmButtonText: "OK",
+                timer: 2000, // Auto close after 2 seconds
             });
 
-            // Optionally, close the modal and reset form fields
+            // Emit event to update other clients with the new task
+            socket.emit("taskUpdated", task);
+
+            // Close modal and reset form
             closeModal();
-            setTaskTitle("");
-            setTaskDescription("");
         } catch (err) {
             console.log(err);
 
             // Show error notification
             Swal.fire({
-                icon: 'error',
-                title: 'Oops...',
-                text: 'Something went wrong while adding the task.',
-                confirmButtonText: 'Try Again',
+                icon: "error",
+                title: "Oops...",
+                text: "Something went wrong while adding the task.",
+                confirmButtonText: "Try Again",
             });
         }
     };
 
     return (
         <div className="w-10/12 mx-auto">
-            <div className=" rounded-lg  mt-6 flex flex-col items-center justify-center p-6 dark:bg-gray-800 transition-colors duration-300">
+            <div className="rounded-lg mt-6 flex flex-col items-center justify-center p-6 dark:bg-gray-800 transition-colors duration-300">
                 <button
                     onClick={openModal}
                     className="px-6 py-3 text-lg font-semibold text-white bg-blue-600 rounded-lg shadow-md hover:bg-blue-700 transition-all"
@@ -98,6 +111,17 @@ export default function AddTask() {
                                             placeholder="Enter Task Description"
                                             value={taskDescription}
                                             onChange={(e) => setTaskDescription(e.target.value)}
+                                            className="mt-1 w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-100 dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                            Finish Time
+                                        </label>
+                                        <input
+                                            type="datetime-local"
+                                            value={taskFinishTime}
+                                            onChange={(e) => setTaskFinishTime(e.target.value)}
                                             className="mt-1 w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-100 dark:bg-gray-700 dark:text-white dark:border-gray-600"
                                         />
                                     </div>
