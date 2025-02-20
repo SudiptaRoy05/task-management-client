@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { FaEdit, FaTrash, FaClock } from "react-icons/fa";
 
 export default function TaskCard({ task, onEdit, onDelete }) {
+    console.log(task)
     const { title, description, timestamp, category, finishTime } = task;
     const [remainingTime, setRemainingTime] = useState("");
 
