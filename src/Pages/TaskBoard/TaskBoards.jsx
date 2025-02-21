@@ -2,31 +2,26 @@ import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 import TaskCard from "./TaskCard";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { io } from "socket.io-client";
 
+// Set up the socket connection
 const socket = io("http://localhost:5000");
 
 export default function TaskBoards() {
+    // Fetch tasks from the API using useQuery
     const { data: tasks = [], isLoading, error, refetch } = useQuery({
-        queryKey: ["tasks"],
+        queryKey: ['tasks'],
         queryFn: async () => {
-            const res = await axios.get("http://localhost:5000/tasks");
+            const res = await axios.get('http://localhost:5000/tasks');
             return res.data;
         },
     });
 
-    // Local state to manage drag-and-drop changes before API update
-    const [localTasks, setLocalTasks] = useState([]);
-
-    // Sync local state when `tasks` updates
+    // Listen for real-time task updates
     useEffect(() => {
-        setLocalTasks(tasks);
-    }, [tasks]);
-
-    useEffect(() => {
-        socket.on("taskUpdated", () => refetch());
-        socket.on("taskDeleted", () => refetch());
+        socket.on("taskUpdated", refetch);
+        socket.on("taskDeleted", refetch);
 
         return () => {
             socket.off("taskUpdated");
@@ -37,35 +32,29 @@ export default function TaskBoards() {
     if (isLoading) return <div>Loading...</div>;
     if (error) return <div>Error loading tasks</div>;
 
-    // 🏆 **Fixed Drag and Drop Handling**
+    // ✅ Fixed Drag and Drop Logic
     const onDragEnd = async (result) => {
         const { source, destination } = result;
-        if (!destination) return;
+        if (!destination) return; // Dropped outside
 
-        // Find the moved task
-        const sourceTasks = localTasks.filter(task => task.category === source.droppableId);
+        const sourceCategory = source.droppableId;
+        const destinationCategory = destination.droppableId;
+
+        // Get filtered tasks for the source category
+        const sourceTasks = tasks.filter(task => task.category === sourceCategory);
         const movedTask = sourceTasks[source.index];
 
         if (!movedTask) return;
 
-        // **Update local state optimistically**
-        const updatedTasks = localTasks.map((task) =>
-            task._id === movedTask._id ? { ...task, category: destination.droppableId } : task
-        );
-
-        setLocalTasks(updatedTasks);
-
-        // **Update task category in the backend**
         try {
             await axios.put(`http://localhost:5000/tasks/${movedTask._id}`, {
                 ...movedTask,
-                category: destination.droppableId,
+                category: destinationCategory,
             });
 
             socket.emit("taskUpdated");
         } catch (error) {
             console.error("Error updating task:", error);
-            setLocalTasks(tasks); // Rollback on error
         }
     };
 
@@ -73,17 +62,19 @@ export default function TaskBoards() {
         <DragDropContext onDragEnd={onDragEnd}>
             <div className="w-10/12 mx-auto">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6 pb-6">
-                    <TaskColumn title="To-Do" tasks={localTasks} category="todo" onEdit={refetch} onDelete={refetch} />
-                    <TaskColumn title="In Progress" tasks={localTasks} category="inProgress" onEdit={refetch} onDelete={refetch} />
-                    <TaskColumn title="Done" tasks={localTasks} category="done" onEdit={refetch} onDelete={refetch} />
+                    <TaskColumn title="To-Do" tasks={tasks} category="todo" />
+                    <TaskColumn title="In Progress" tasks={tasks} category="inProgress" />
+                    <TaskColumn title="Done" tasks={tasks} category="done" />
                 </div>
             </div>
         </DragDropContext>
     );
 }
 
-// TaskColumn Component for Reusability
-function TaskColumn({ title, tasks, category, onEdit, onDelete }) {
+// ✅ Fixed TaskColumn Component
+function TaskColumn({ title, tasks, category }) {
+    const filteredTasks = tasks.filter(task => task.category === category); // Get tasks for the category
+
     return (
         <Droppable droppableId={category}>
             {(provided) => (
@@ -93,23 +84,19 @@ function TaskColumn({ title, tasks, category, onEdit, onDelete }) {
                     {...provided.droppableProps}
                 >
                     <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">{title}</h2>
-                    <div className="space-y-4">
-                        {tasks
-                            .filter(task => task.category === category)
-                            .map((task, index) => (
-                                <Draggable key={task._id} draggableId={task._id} index={index}>
-                                    {(provided) => (
-                                        <div
-                                            ref={provided.innerRef}
-                                            {...provided.draggableProps}
-                                            {...provided.dragHandleProps}
-                                        >
-                                            <TaskCard task={task} onEdit={onEdit} onDelete={onDelete} />
-                                        </div>
-                                    )}
-                                </Draggable>
-                            ))}
-                    </div>
+                    {filteredTasks.map((task, index) => (
+                        <Draggable key={task._id} draggableId={task._id} index={index}>
+                            {(provided) => (
+                                <div
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    {...provided.dragHandleProps}
+                                >
+                                    <TaskCard task={task} />
+                                </div>
+                            )}
+                        </Draggable>
+                    ))}
                     {provided.placeholder}
                 </div>
             )}
