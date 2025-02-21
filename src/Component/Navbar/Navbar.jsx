@@ -45,9 +45,9 @@ export default function Navbar() {
     };
 
     return (
-        <div className="bg-gray-900 dark:bg-gray-800">
+        <div className="bg-blue-600 dark:bg-gray-800">
             <div className="navbar w-10/12 mx-auto flex justify-between items-center py-4">
-                <a className="text-white font-bold text-xl">WorkFlow</a>
+                <a className="text-white font-bold text-xl">DOs</a>
                 <div className="flex items-center gap-4">
                     {/* Theme Toggle Button */}
                     <button

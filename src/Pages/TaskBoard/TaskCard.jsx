@@ -24,8 +24,23 @@ export default function TaskCard({ task, onEdit, onDelete }) {
         closeModal();
     };
 
+    // Category-based colors
+    const categoryColors = {
+        todo: "border-blue-500 bg-blue-50 dark:bg-blue-900",
+        inProgress: "border-yellow-500 bg-yellow-50 dark:bg-yellow-900",
+        done: "border-green-500 bg-green-50 dark:bg-green-900",
+    };
+
+    // Determine card color based on category or time's up
+    const getCardColor = () => {
+        if (remainingTime === "Time's up!") {
+            return "border-red-500 bg-red-50 dark:bg-red-900";
+        }
+        return categoryColors[category] || "border-blue-500 bg-blue-50 dark:bg-blue-900";
+    };
+
     useEffect(() => {
-        if (!finishTime) {
+        if (!finishTime || category === "done") {
             setRemainingTime("No deadline set");
             return;
         }
@@ -51,12 +66,12 @@ export default function TaskCard({ task, onEdit, onDelete }) {
         const interval = setInterval(updateCountdown, 1000);
 
         return () => clearInterval(interval);
-    }, [finishTime]);
+    }, [finishTime, category]);
 
     return (
         <>
             {/* Task Card */}
-            <div className="bg-white dark:bg-gray-800 p-5 my-3 rounded-lg shadow-lg space-y-3 relative border-l-4 border-blue-500">
+            <div className={`p-5 my-3 rounded-lg shadow-lg space-y-3 relative border-l-4 ${getCardColor()}`}>
                 {/* Title & Actions */}
                 <div className="flex justify-between items-center">
                     <h3 className="font-semibold text-gray-800 dark:text-white text-lg truncate">{title}</h3>
@@ -84,7 +99,7 @@ export default function TaskCard({ task, onEdit, onDelete }) {
                 </div>
 
                 {/* Countdown Timer */}
-                {finishTime && (
+                {finishTime && category !== "done" && (
                     <div className="flex items-center text-xs font-medium text-red-500 dark:text-red-400 mt-2 space-x-2">
                         <FaClock className="text-sm" />
                         <span>{remainingTime}</span>

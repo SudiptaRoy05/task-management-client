@@ -4,7 +4,7 @@ import axios from "axios";
 import { AuthContext } from "../../Provider/AuthProvider";
 import TaskCard from "./TaskCard";
 import { io } from "socket.io-client";
-import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 
 const socket = io("http://localhost:5000");
 
@@ -22,15 +22,15 @@ export default function TaskBoards() {
             return res.data;
         },
         enabled: !!user?.email,
-        refetchInterval: 5000, 
+        refetchInterval: 1000, // Refetch every second
     });
 
-    
+    // Update local tasks state when fetchedTasks changes
     useEffect(() => {
         setTasks(fetchedTasks);
     }, [fetchedTasks]);
 
-    
+    // WebSocket event listeners
     useEffect(() => {
         socket.on("TASK_UPDATED", (updatedTask) => {
             setTasks((prevTasks) =>
@@ -50,7 +50,7 @@ export default function TaskBoards() {
         };
     }, []);
 
-    
+    // Delete a task
     const deleteTask = async (taskId) => {
         try {
             const response = await axios.delete(`http://localhost:5000/tasks/${taskId}`);
@@ -88,8 +88,15 @@ export default function TaskBoards() {
         if (destination.droppableId === source.droppableId && destination.index === source.index) return;
 
         const movedTask = tasks.find((task) => task._id === draggableId);
+        if (!movedTask) {
+            console.error("Draggable task not found:", draggableId);
+            return;
+        }
+
+        // Update the task category on the server
         editTask(movedTask._id, { category: destination.droppableId });
 
+        // Update the local state immediately for a smoother UX
         setTasks((prevTasks) => {
             const newTasks = [...prevTasks];
             const sourceIndex = newTasks.findIndex((task) => task._id === draggableId);
@@ -115,8 +122,8 @@ export default function TaskBoards() {
     );
 
     return (
-        <div className="w-10/12 mx-auto">
-            <h2 className="text-xl font-bold mb-4">My Tasks</h2>
+        <div className="w-10/12 mx-auto py-8">
+            <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">My Tasks</h2>
 
             <DragDropContext onDragEnd={handleOnDragEnd}>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -126,11 +133,17 @@ export default function TaskBoards() {
                                 <div
                                     ref={provided.innerRef}
                                     {...provided.droppableProps}
-                                    className={`border p-2 rounded ${snapshot.isDraggingOver ? "dragging-over" : "droppable-area"}`}
+                                    className={`border p-4 rounded-lg shadow-sm ${
+                                        snapshot.isDraggingOver
+                                            ? "bg-blue-100 dark:bg-blue-900"
+                                            : "bg-white dark:bg-gray-800"
+                                    }`}
                                 >
-                                    <h3 className="text-lg font-semibold mb-2">{category}</h3>
+                                    <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">
+                                        {category}
+                                    </h3>
                                     {tasks.length === 0 ? (
-                                        <p>No tasks found</p>
+                                        <p className="text-gray-600 dark:text-gray-400">No tasks found</p>
                                     ) : (
                                         tasks.map((task, index) => (
                                             <Draggable key={task._id} draggableId={task._id} index={index}>
