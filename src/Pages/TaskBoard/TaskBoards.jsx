@@ -1,105 +1,163 @@
-import { useQuery } from "@tanstack/react-query";
+import { useContext, useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
-import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
+import { AuthContext } from "../../Provider/AuthProvider";
 import TaskCard from "./TaskCard";
-import { useEffect } from "react";
 import { io } from "socket.io-client";
+import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 
-// Set up the socket connection
 const socket = io("http://localhost:5000");
 
 export default function TaskBoards() {
-    // Fetch tasks from the API using useQuery
-    const { data: tasks = [], isLoading, error, refetch } = useQuery({
-        queryKey: ['tasks'],
+    const { user } = useContext(AuthContext);
+    const queryClient = useQueryClient();
+    const [tasks, setTasks] = useState([]);
+
+    // Fetch tasks with polling
+    const { data: fetchedTasks = [], isLoading, error } = useQuery({
+        queryKey: ["tasks", user?.email],
         queryFn: async () => {
-            const res = await axios.get('http://localhost:5000/tasks');
+            if (!user?.email) return [];
+            const res = await axios.get(`http://localhost:5000/tasks?email=${user.email}`);
             return res.data;
         },
+        enabled: !!user?.email,
+        refetchInterval: 5000, 
     });
 
-    // Listen for real-time task updates
+    
     useEffect(() => {
-        socket.on("taskUpdated", refetch);
-        socket.on("taskDeleted", refetch);
+        setTasks(fetchedTasks);
+    }, [fetchedTasks]);
+
+    
+    useEffect(() => {
+        socket.on("TASK_UPDATED", (updatedTask) => {
+            setTasks((prevTasks) =>
+                prevTasks.map((task) =>
+                    task._id === updatedTask._id ? updatedTask : task
+                )
+            );
+        });
+
+        socket.on("TASK_DELETED", ({ id }) => {
+            setTasks((prevTasks) => prevTasks.filter((task) => task._id !== id));
+        });
 
         return () => {
-            socket.off("taskUpdated");
-            socket.off("taskDeleted");
+            socket.off("TASK_UPDATED");
+            socket.off("TASK_DELETED");
         };
-    }, [refetch]);
+    }, []);
 
-    if (isLoading) return <div>Loading...</div>;
-    if (error) return <div>Error loading tasks</div>;
-
-    // ✅ Fixed Drag and Drop Logic
-    const onDragEnd = async (result) => {
-        const { source, destination } = result;
-        if (!destination) return; // Dropped outside
-
-        const sourceCategory = source.droppableId;
-        const destinationCategory = destination.droppableId;
-
-        // Get filtered tasks for the source category
-        const sourceTasks = tasks.filter(task => task.category === sourceCategory);
-        const movedTask = sourceTasks[source.index];
-
-        if (!movedTask) return;
-
+    
+    const deleteTask = async (taskId) => {
         try {
-            await axios.put(`http://localhost:5000/tasks/${movedTask._id}`, {
-                ...movedTask,
-                category: destinationCategory,
-            });
-
-            socket.emit("taskUpdated");
+            const response = await axios.delete(`http://localhost:5000/tasks/${taskId}`);
+            if (response.status === 200) {
+                setTasks((prevTasks) => prevTasks.filter((task) => task._id !== taskId));
+                socket.emit("TASK_DELETED", { id: taskId });
+            }
         } catch (error) {
-            console.error("Error updating task:", error);
+            console.error("Error deleting task", error);
         }
     };
 
-    return (
-        <DragDropContext onDragEnd={onDragEnd}>
-            <div className="w-10/12 mx-auto">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6 pb-6">
-                    <TaskColumn title="To-Do" tasks={tasks} category="todo" />
-                    <TaskColumn title="In Progress" tasks={tasks} category="inProgress" />
-                    <TaskColumn title="Done" tasks={tasks} category="done" />
-                </div>
-            </div>
-        </DragDropContext>
+    // Edit a task
+    const editTask = async (taskId, updatedTask) => {
+        try {
+            const response = await axios.put(`http://localhost:5000/tasks/${taskId}`, updatedTask);
+            if (response.status === 200) {
+                setTasks((prevTasks) =>
+                    prevTasks.map((task) =>
+                        task._id === taskId ? { ...task, ...updatedTask } : task
+                    )
+                );
+                socket.emit("TASK_UPDATED", response.data);
+            }
+        } catch (error) {
+            console.error("Error updating task", error);
+        }
+    };
+
+    // Handle drag-and-drop
+    const handleOnDragEnd = (result) => {
+        const { destination, source, draggableId } = result;
+
+        if (!destination) return;
+        if (destination.droppableId === source.droppableId && destination.index === source.index) return;
+
+        const movedTask = tasks.find((task) => task._id === draggableId);
+        editTask(movedTask._id, { category: destination.droppableId });
+
+        setTasks((prevTasks) => {
+            const newTasks = [...prevTasks];
+            const sourceIndex = newTasks.findIndex((task) => task._id === draggableId);
+            const [removedTask] = newTasks.splice(sourceIndex, 1);
+            removedTask.category = destination.droppableId;
+            newTasks.splice(destination.index, 0, removedTask);
+            return newTasks;
+        });
+    };
+
+    if (isLoading) return <p>Loading tasks...</p>;
+    if (error) return <p>Error fetching tasks</p>;
+
+    // Categorize tasks
+    const categories = tasks.reduce(
+        (acc, task) => {
+            if (acc[task.category]) {
+                acc[task.category].push(task);
+            }
+            return acc;
+        },
+        { todo: [], inProgress: [], done: [] }
     );
-}
-
-// ✅ Fixed TaskColumn Component
-function TaskColumn({ title, tasks, category }) {
-    const filteredTasks = tasks.filter(task => task.category === category); // Get tasks for the category
 
     return (
-        <Droppable droppableId={category}>
-            {(provided) => (
-                <div
-                    className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md space-y-4"
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                >
-                    <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">{title}</h2>
-                    {filteredTasks.map((task, index) => (
-                        <Draggable key={task._id} draggableId={task._id} index={index}>
-                            {(provided) => (
+        <div className="w-10/12 mx-auto">
+            <h2 className="text-xl font-bold mb-4">My Tasks</h2>
+
+            <DragDropContext onDragEnd={handleOnDragEnd}>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {Object.entries(categories).map(([category, tasks]) => (
+                        <Droppable key={category} droppableId={category}>
+                            {(provided, snapshot) => (
                                 <div
                                     ref={provided.innerRef}
-                                    {...provided.draggableProps}
-                                    {...provided.dragHandleProps}
+                                    {...provided.droppableProps}
+                                    className={`border p-2 rounded ${snapshot.isDraggingOver ? "dragging-over" : "droppable-area"}`}
                                 >
-                                    <TaskCard task={task} />
+                                    <h3 className="text-lg font-semibold mb-2">{category}</h3>
+                                    {tasks.length === 0 ? (
+                                        <p>No tasks found</p>
+                                    ) : (
+                                        tasks.map((task, index) => (
+                                            <Draggable key={task._id} draggableId={task._id} index={index}>
+                                                {(provided) => (
+                                                    <div
+                                                        ref={provided.innerRef}
+                                                        {...provided.draggableProps}
+                                                        {...provided.dragHandleProps}
+                                                        className="mb-2"
+                                                    >
+                                                        <TaskCard
+                                                            task={task}
+                                                            onDelete={() => deleteTask(task._id)}
+                                                            onEdit={(updatedTask) => editTask(task._id, updatedTask)}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </Draggable>
+                                        ))
+                                    )}
+                                    {provided.placeholder}
                                 </div>
                             )}
-                        </Draggable>
+                        </Droppable>
                     ))}
-                    {provided.placeholder}
                 </div>
-            )}
-        </Droppable>
+            </DragDropContext>
+        </div>
     );
 }

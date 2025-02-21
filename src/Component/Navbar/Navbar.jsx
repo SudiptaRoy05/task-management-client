@@ -2,6 +2,7 @@ import { useState, useEffect, useContext } from "react";
 import { BsMoon, BsSun } from "react-icons/bs";
 import { FaGoogle } from "react-icons/fa";
 import { AuthContext } from "../../Provider/AuthProvider";
+import axios from "axios";
 
 export default function Navbar() {
     const { user, googleLogin, logout } = useContext(AuthContext);

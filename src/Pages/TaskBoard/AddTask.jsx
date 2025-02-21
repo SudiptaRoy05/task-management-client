@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import axios from "axios";
-import Swal from "sweetalert2"; // Import SweetAlert2
-import { io } from "socket.io-client"; // Import Socket.io client
+import Swal from "sweetalert2"; 
+import { io } from "socket.io-client"; 
+import { AuthContext } from "../../Provider/AuthProvider";
 
 // Set up the socket connection
 const socket = io("http://localhost:5000");
@@ -11,7 +12,8 @@ export default function AddTask() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [taskTitle, setTaskTitle] = useState("");
     const [taskDescription, setTaskDescription] = useState("");
-    const [taskFinishTime, setTaskFinishTime] = useState(""); // New state for finish time
+    const [taskFinishTime, setTaskFinishTime] = useState(""); 
+    const {user} = useContext(AuthContext);
 
     const openModal = () => setIsModalOpen(true);
     const closeModal = () => {
@@ -27,8 +29,9 @@ export default function AddTask() {
             title: taskTitle,
             description: taskDescription,
             category: "todo",
-            timestamp: new Date().toISOString(), // Auto-generate timestamp
-            finishTime: taskFinishTime, // Store finish time
+            timestamp: new Date().toISOString(), 
+            finishTime: taskFinishTime, 
+            email : user?.email
         };
 
         try {
