@@ -18,7 +18,7 @@ export default function TaskBoards() {
         queryKey: ["tasks", user?.email],
         queryFn: async () => {
             if (!user?.email) return [];
-            const res = await axios.get(`http://localhost:5000/tasks?email=${user.email}`);
+            const res = await axios.get(`https://task-management-server-1-suzh.onrender.com/tasks?email=${user.email}`);
             return res.data;
         },
         enabled: !!user?.email,
@@ -53,7 +53,7 @@ export default function TaskBoards() {
     // Delete a task
     const deleteTask = async (taskId) => {
         try {
-            const response = await axios.delete(`http://localhost:5000/tasks/${taskId}`);
+            const response = await axios.delete(`https://task-management-server-1-suzh.onrender.com/tasks/${taskId}`);
             if (response.status === 200) {
                 setTasks((prevTasks) => prevTasks.filter((task) => task._id !== taskId));
                 socket.emit("TASK_DELETED", { id: taskId });
@@ -66,7 +66,7 @@ export default function TaskBoards() {
     // Edit a task
     const editTask = async (taskId, updatedTask) => {
         try {
-            const response = await axios.put(`http://localhost:5000/tasks/${taskId}`, updatedTask);
+            const response = await axios.put(`https://task-management-server-1-suzh.onrender.com/tasks/${taskId}`, updatedTask);
             if (response.status === 200) {
                 setTasks((prevTasks) =>
                     prevTasks.map((task) =>
