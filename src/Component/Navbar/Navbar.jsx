@@ -30,7 +30,7 @@ export default function Navbar() {
                     email: result.user?.email,
                     image: result.user?.photoURL,
                 };
-                axios.post("http://localhost:5000/user", userInfo);
+                axios.post("https://task-management-server-1-suzh.onrender.com/user", userInfo);
             })
             .catch((error) => console.error("Google login failed:", error));
     };
